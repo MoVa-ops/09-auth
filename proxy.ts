@@ -22,7 +22,7 @@ export async function proxy(request: NextRequest) {
 
   if (accessToken) {
     if (isPublicRoute) {
-      return NextResponse.redirect(new URL("/profile", request.url));
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
     return NextResponse.next();
@@ -33,29 +33,43 @@ export async function proxy(request: NextRequest) {
 
     if (session) {
       const response = isPublicRoute
-        ? NextResponse.redirect(new URL("/profile", request.url))
+        ? NextResponse.redirect(new URL("/", request.url))
         : NextResponse.next();
 
       const setCookie = session.headers["set-cookie"];
 
       if (setCookie) {
-        const cookieArray = Array.isArray(setCookie) ? setCookie : [setCookie];
+        const cookieArray = Array.isArray(setCookie)
+          ? setCookie
+          : [setCookie];
 
         for (const cookieStr of cookieArray) {
           const parsed = parse(cookieStr);
 
           const options = {
-            expires: parsed.Expires ? new Date(parsed.Expires) : undefined,
+            expires: parsed.Expires
+              ? new Date(parsed.Expires)
+              : undefined,
             path: parsed.Path,
-            maxAge: parsed["Max-Age"] ? Number(parsed["Max-Age"]) : undefined,
+            maxAge: parsed["Max-Age"]
+              ? Number(parsed["Max-Age"])
+              : undefined,
           };
 
           if (parsed.accessToken) {
-            response.cookies.set("accessToken", parsed.accessToken, options);
+            response.cookies.set(
+              "accessToken",
+              parsed.accessToken,
+              options
+            );
           }
 
           if (parsed.refreshToken) {
-            response.cookies.set("refreshToken", parsed.refreshToken, options);
+            response.cookies.set(
+              "refreshToken",
+              parsed.refreshToken,
+              options
+            );
           }
         }
       }
