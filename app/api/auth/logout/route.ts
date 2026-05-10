@@ -6,15 +6,15 @@ import { api } from "../../api";
 import { logErrorResponse } from "../../_utils/utils";
 
 export async function POST() {
-  const cookieStore = await cookies();
-
-  const cookiesString = cookieStore
-    .getAll()
-    .map(({ name, value }) => `${name}=${value}`)
-    .join("; ");
-
   try {
-    const apiRes = await api.post("/auth/logout", null, {
+    const cookieStore = await cookies();
+
+    const cookiesString = cookieStore
+      .getAll()
+      .map(({ name, value }) => `${name}=${value}`)
+      .join("; ");
+
+    await api.post("/auth/logout", null, {
       headers: {
         Cookie: cookiesString,
       },
@@ -23,14 +23,14 @@ export async function POST() {
     cookieStore.delete("accessToken");
     cookieStore.delete("refreshToken");
 
-    return NextResponse.json(apiRes.data, { status: apiRes.status });
+    return NextResponse.json({ message: "Logged out successfully" });
   } catch (error) {
     if (isAxiosError(error)) {
       logErrorResponse(error.response?.data);
 
       return NextResponse.json(
-        { error: error.response?.data?.error },
-        { status: error.response?.status }
+        { error: error.message, response: error.response?.data },
+        { status: error.status }
       );
     }
 
