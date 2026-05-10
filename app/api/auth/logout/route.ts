@@ -1,40 +1,44 @@
-// app/api/auth/logout/route.ts
-
 import { NextResponse } from "next/server";
-import { api } from "../../api";
 import { cookies } from "next/headers";
+import { isAxiosError } from "axios";
+
+import { api } from "../../api";
+import { logErrorResponse } from "../../_utils/utils";
 
 export async function POST() {
   const cookieStore = await cookies();
 
+  const cookiesString = cookieStore
+    .getAll()
+    .map(({ name, value }) => `${name}=${value}`)
+    .join("; ");
+
   try {
-    // Формуємо правильні заголовки Cookie
-    const cookieHeader = [];
-    const accessToken = cookieStore.get("accessToken")?.value;
-    const refreshToken = cookieStore.get("refreshToken")?.value;
-
-    if (accessToken) cookieHeader.push(`accessToken=${accessToken}`);
-    if (refreshToken) cookieHeader.push(`refreshToken=${refreshToken}`);
-
-    // Робимо запит до зовнішнього API
-    await api.post("/auth/logout", null, {
+    const apiRes = await api.post("/auth/logout", null, {
       headers: {
-        Cookie: cookieHeader.join("; "),
+        Cookie: cookiesString,
       },
     });
-  } catch {
-    // Ігноруємо помилки від зовнішнього API, все одно очищаємо куки
-    console.log(
-      "External logout API might not be available, proceeding with local cleanup"
+
+    cookieStore.delete("accessToken");
+    cookieStore.delete("refreshToken");
+
+    return NextResponse.json(apiRes.data, { status: apiRes.status });
+  } catch (error) {
+    if (isAxiosError(error)) {
+      logErrorResponse(error.response?.data);
+
+      return NextResponse.json(
+        { error: error.response?.data?.error },
+        { status: error.response?.status }
+      );
+    }
+
+    logErrorResponse({ message: (error as Error).message });
+
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
     );
   }
-
-  // Завжди очищаємо куки на нашому сервері
-  cookieStore.delete("accessToken");
-  cookieStore.delete("refreshToken");
-
-  return NextResponse.json(
-    { message: "Logged out successfully" },
-    { status: 200 }
-  );
 }

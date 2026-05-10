@@ -1,10 +1,9 @@
-// app/(private routes)/profile/page.tsx
-
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 
 import { getMe } from "@/lib/api/serverApi";
-import ProfileClient from "./ProfileClient";
 
 export const metadata: Metadata = {
   title: "User Profile - NoteHub",
@@ -21,5 +20,19 @@ export default async function Profile() {
     redirect("/sign-in");
   }
 
-  return <ProfileClient user={user} />;
+  return (
+    <main>
+      <Image
+        src={user.avatar || "/default-avatar.png"}
+        alt={user.username}
+        width={120}
+        height={120}
+      />
+
+      <h1>{user.username}</h1>
+      <p>{user.email}</p>
+
+      <Link href="/profile/edit">Edit profile</Link>
+    </main>
+  );
 }

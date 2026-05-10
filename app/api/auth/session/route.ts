@@ -1,5 +1,3 @@
-// app/api/auth/session/route.ts
-
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { api } from "../../api";
@@ -7,89 +5,53 @@ import { parse } from "cookie";
 import { isAxiosError } from "axios";
 import { logErrorResponse } from "../../_utils/utils";
 
-// Допоміжна функція для отримання cookies у вигляді рядка
-async function getCookiesString(): Promise<string> {
-  const cookieStore = await cookies();
-  const cookieArray = cookieStore
-    .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`);
-  return cookieArray.join("; ");
-}
-
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get("accessToken")?.value;
-    const refreshToken = cookieStore.get("refreshToken")?.value;
 
-    if (accessToken) {
-      return NextResponse.json({ success: true });
-    }
+    const cookiesString = cookieStore
+      .getAll()
+      .map(({ name, value }) => `${name}=${value}`)
+      .join("; ");
 
-    if (refreshToken) {
-      const cookieString = await getCookiesString();
-      const apiRes = await api.get("auth/session", {
-        headers: {
-          Cookie: cookieString,
-        },
-      });
+    const apiRes = await api.get("auth/session", {
+      headers: {
+        Cookie: cookiesString,
+      },
+    });
 
-      const setCookie = apiRes.headers["set-cookie"];
+    const setCookie = apiRes.headers["set-cookie"];
 
-      if (setCookie) {
-        const cookieArray = Array.isArray(setCookie) ? setCookie : [setCookie];
-        for (const cookieStr of cookieArray) {
-          const parsed = parse(cookieStr);
+    if (setCookie) {
+      const cookieArray = Array.isArray(setCookie) ? setCookie : [setCookie];
 
-          const options = {
-            expires: parsed.Expires ? new Date(parsed.Expires) : undefined,
-            path: parsed.Path,
-            maxAge: parsed["Max-Age"] ? Number(parsed["Max-Age"]) : undefined,
-            secure: parsed.Secure === "true",
-            httpOnly: parsed.HttpOnly === "true",
-            sameSite: parsed.SameSite as "lax" | "strict" | "none" | undefined,
-          };
+      for (const cookieStr of cookieArray) {
+        const parsed = parse(cookieStr);
 
-          // Безпечне встановлення cookies
-          if (parsed.accessToken) {
-            cookieStore.set({
-              name: "accessToken",
-              value: parsed.accessToken,
-              ...options,
-            });
-          }
-          if (parsed.refreshToken) {
-            cookieStore.set({
-              name: "refreshToken",
-              value: parsed.refreshToken,
-              ...options,
-            });
-          }
+        const options = {
+          expires: parsed.Expires ? new Date(parsed.Expires) : undefined,
+          path: parsed.Path,
+          maxAge: parsed["Max-Age"] ? Number(parsed["Max-Age"]) : undefined,
+        };
+
+        if (parsed.accessToken) {
+          cookieStore.set("accessToken", parsed.accessToken, options);
         }
-        return NextResponse.json({ success: true }, { status: 200 });
+
+        if (parsed.refreshToken) {
+          cookieStore.set("refreshToken", parsed.refreshToken, options);
+        }
       }
     }
-    return NextResponse.json({ success: false }, { status: 200 });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     if (isAxiosError(error)) {
       logErrorResponse(error.response?.data);
-      // Повертаємо більш інформативну відповідь для debug
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message,
-          status: error.response?.status,
-        },
-        { status: 200 }
-      );
+    } else {
+      logErrorResponse({ message: (error as Error).message });
     }
-    logErrorResponse({ message: (error as Error).message });
-    return NextResponse.json(
-      {
-        success: false,
-        error: (error as Error).message,
-      },
-      { status: 200 }
-    );
+
+    return NextResponse.json({ success: false });
   }
 }
